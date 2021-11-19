@@ -1,0 +1,26 @@
+.square {
+  width: 60px;
+  height: 60px;
+}
+
+.black {
+  background-color: black;
+}
+
+.white-piece {
+  width: 40px;
+  height: 40px;
+  border-radius: 40px;
+  background-color: white;
+}
+
+.red-piece {
+  width: 40px;
+  height: 40px;
+  border-radius: 40px;
+  background-color: red;
+}
+
+.highlighted {
+  background: rgba(39, 143, 44, 0.616);
+}
