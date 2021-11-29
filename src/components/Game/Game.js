@@ -5,8 +5,6 @@ import Status from '../Status/Status';
 import './Game.scss';
 
 // TODO: Consider having an undo button?
-// TODO: Promotion and King pieces
-// TODO: Logic for when to cut off available moves for player (e.g. initiated eating/jumping sequence vs regular move)
 class Game extends Component {
   constructor(props) {
     super(props);
@@ -25,7 +23,7 @@ class Game extends Component {
     this.setState({
       ...this.state,
       isWhiteMove: !this.state.isWhiteMove,
-      movedPieceCoordinates: null
+      movedPieceCoordinates: null,
     });
   }
 
@@ -64,6 +62,7 @@ class Game extends Component {
     }
 
     return(
+      
       <div className='game'>
         <Board
           isWhiteMove={this.state.isWhiteMove}

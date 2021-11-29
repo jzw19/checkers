@@ -9,17 +9,19 @@ class Square extends Component {
   }
 
   renderPiece() {
-    if(this.props.hasWhitePiece) {
-      return(
-        <button className="white-piece" onClick={this.props.onClickPiece} />
-      );
-    } else if(this.props.hasRedPiece) {
-      return(
-        <button className="red-piece" onClick={this.props.onClickPiece} />
-      );
-    } else {
-      return null;
+    if(this.props.isWhiteSquare || (!this.props.hasWhitePiece && !this.props.hasRedPiece)) {
+      return;
     }
+    let className;
+    if(this.props.hasWhitePiece) {
+      className = 'white-piece';
+    } else if(this.props.hasRedPiece) {
+      className = 'red-piece';
+    }
+    // TODO: Use a text element to style the K so that it's more visible
+    return this.props.hasKingPiece ?
+      <button className={className} onClick={this.props.onClickPiece}>K</button>
+      : <button className={className} onClick={this.props.onClickPiece}/>;
   }
 
   render() {

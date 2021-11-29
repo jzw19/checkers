@@ -30,6 +30,8 @@ class Board extends Component {
         [0, 0, 0, 0, 0, 0, 0, 0]
       ],
       isShowingAvailableMovesFor: null,
+      hasStepped: false,
+      hasSkipped: false,
       redPieceCount: 12,
       whitePieceCount: 12
     };
@@ -37,9 +39,10 @@ class Board extends Component {
     this.hasPiece = this.hasPiece.bind(this);
     this.showMovesForPiece = this.showMovesForPiece.bind(this);
     this.movePieceTo = this.movePieceTo.bind(this);
-    this.renderMoves = this.renderMoves.bind(this);
+    this.checkPromotion = this.checkPromotion.bind(this);
     this.renderBoard = this.renderBoard.bind(this);
     this.populateRow = this.populateRow.bind(this);
+    this.pushToRowDisplay = this.pushToRowDisplay.bind(this);
     this.onClickPiece = this.onClickPiece.bind(this);
     this.removePiece = this.removePiece.bind(this);
   }
@@ -49,7 +52,9 @@ class Board extends Component {
       this.setState({
         ...this.state,
         availableMoves: cleanAvailableMovesState,
-        isShowingAvailableMovesFor: null
+        isShowingAvailableMovesFor: null,
+        hasStepped: false,
+        hasSkipped: false
       });
     }
   }
@@ -63,6 +68,14 @@ class Board extends Component {
   }
 
   showMovesForPiece(row, column) {
+    if(this.state.hasStepped) {
+      this.setState({
+        ...this.state,
+        availableMoves: JSON.parse(JSON.stringify(cleanAvailableMovesState)),
+        isShowingAvailableMovesFor: null
+      });
+      return;
+    }
     const pieceValue = this.state.board[row][column];
     const hasMovedButIsNotMovedPiece = this.props.movedPieceCoordinates && (row !== this.props.movedPieceCoordinates[0] || column !== this.props.movedPieceCoordinates[1]);
     const isAlreadySelectedPiece = this.state.isShowingAvailableMovesFor && this.state.isShowingAvailableMovesFor[0] === row && this.state.isShowingAvailableMovesFor[1] === column;
@@ -76,11 +89,11 @@ class Board extends Component {
       });
     } else {
       if(pieceValue > 2) {
-        nextAvailableMoves = showKingMoves(row, column, this.props.isWhiteMove, nextAvailableMoves, this.state.board);
+        nextAvailableMoves = showKingMoves(row, column, this.props.isWhiteMove, nextAvailableMoves, this.state.board, this.state.hasSkipped);
       } else if(pieceValue === 2) {
-        nextAvailableMoves = showMovesDown(row, column, false, nextAvailableMoves, this.state.board);
+        nextAvailableMoves = showMovesDown(row, column, false, nextAvailableMoves, this.state.board, this.state.hasSkipped);
       } else if(pieceValue === 1) {
-        nextAvailableMoves = showMovesUp(row, column, true, nextAvailableMoves, this.state.board);
+        nextAvailableMoves = showMovesUp(row, column, true, nextAvailableMoves, this.state.board, this.state.hasSkipped);
       }
 
       this.setState({
@@ -94,8 +107,8 @@ class Board extends Component {
   removePiece(destinationRow, destinationColumn, originRow, originColumn, nextBoard) {
     const removalRow = (destinationRow + originRow) / 2;
     const removalColumn = (destinationColumn + originColumn) / 2;
-    const nextRedPieceCount = this.state.board[removalRow][removalColumn] === 2 ? this.state.redPieceCount - 1 : this.state.redPieceCount;
-    const nextWhitePieceCount = this.state.board[removalRow][removalColumn] === 1 ? this.state.whitePieceCount - 1 : this.state.whitePieceCount;
+    const nextRedPieceCount = this.state.board[removalRow][removalColumn] % 10 === 2 ? this.state.redPieceCount - 1 : this.state.redPieceCount;
+    const nextWhitePieceCount = this.state.board[removalRow][removalColumn] % 10 === 1 ? this.state.whitePieceCount - 1 : this.state.whitePieceCount;
     nextBoard[removalRow][removalColumn] = 0;
     return [nextRedPieceCount, nextWhitePieceCount];
   }
@@ -104,22 +117,31 @@ class Board extends Component {
     if(this.state.isShowingAvailableMovesFor === null || this.state.availableMoves[row][column] !== 1) {
       return;
     }
-    let nextAvailableMoves = JSON.parse(JSON.stringify(cleanAvailableMovesState));
 
-    const selectedPieceRow = this.state.isShowingAvailableMovesFor[0];
-    const selectedPieceColumn = this.state.isShowingAvailableMovesFor[1];
-    const pieceValue = this.state.board[selectedPieceRow][selectedPieceColumn];
+    const [selectedPieceRow, selectedPieceColumn] = this.state.isShowingAvailableMovesFor;
+    const destinationPieceValue = this.state.board[selectedPieceRow][selectedPieceColumn];
+    let nextAvailableMoves = JSON.parse(JSON.stringify(cleanAvailableMovesState));
     let nextRedPieceCount = this.state.redPieceCount;
     let nextWhitePieceCount = this.state.whitePieceCount;
 
     let nextBoard = [...this.state.board];
-    // TODO: need to check for promotion conditions here
-    nextBoard[row][column] = pieceValue;
+    if(this.checkPromotion(row, destinationPieceValue)) {
+      nextBoard[row][column] = destinationPieceValue + 10;
+    } else {
+      nextBoard[row][column] = destinationPieceValue;
+    }
     nextBoard[selectedPieceRow][selectedPieceColumn] = 0;
+
+    let hasMadeSkipMove = this.state.hasSkipped;
     if(Math.abs(row - selectedPieceRow) === 2) {
       [nextRedPieceCount, nextWhitePieceCount] = this.removePiece(row, column, selectedPieceRow, selectedPieceColumn, nextBoard);
+      if(destinationPieceValue > 2) {
+        nextAvailableMoves = showKingMoves(row, column, this.props.isWhiteMove, nextAvailableMoves, this.state.board, true);
+      } else {
+        nextAvailableMoves = this.props.isWhiteMove ? showMovesUp(row, column, this.props.isWhiteMove, nextAvailableMoves, this.state.board, true) : showMovesDown(row, column, this.props.isWhiteMove, nextAvailableMoves, this.state.board, true);
+      }
+      hasMadeSkipMove = true;
     }
-    nextAvailableMoves = this.props.isWhiteMove ? showMovesUp(row, column, this.props.isWhiteMove, nextAvailableMoves, this.state.board) : showMovesDown(row, column, this.props.isWhiteMove, nextAvailableMoves, this.state.board);
 
     this.setState({
       ...this.state,
@@ -127,11 +149,21 @@ class Board extends Component {
       availableMoves: nextAvailableMoves,
       isShowingAvailableMovesFor: [row, column],
       redPieceCount: nextRedPieceCount,
-      whitePieceCount: nextWhitePieceCount
+      whitePieceCount: nextWhitePieceCount,
+      hasSkipped: hasMadeSkipMove
     });
+
     this.props.setMovedPieceCoordinates(row, column);
     if(!nextRedPieceCount || !nextWhitePieceCount) {
       this.props.setWinner(!nextRedPieceCount ? 'white' : 'red');
+    }
+  }
+
+  checkPromotion(row, destinationPieceValue) {
+    if(this.props.isWhiteMove) {
+      return row === 0 && destinationPieceValue <= 2;
+    } else {
+      return row === 7 && destinationPieceValue <= 2;
     }
   }
 
@@ -164,73 +196,38 @@ class Board extends Component {
 
   populateRow(row, column, rowDisplay) {
     if(row % 2 === 0) {
-      column % 2 === 0 ?
-        rowDisplay.push(
-          <Square
-            isWhiteSquare={true}
-            hasWhitePiece={false}
-            hasRedPiece={false}
-          />
-        ) : rowDisplay.push(
-          <Square
-            isWhiteSquare={false}
-            hasWhitePiece={this.state.board[row][column] === 1}
-            hasRedPiece={this.state.board[row][column] === 2}
-            onClickPiece={(event) => this.onClickPiece(row, column, event)}
-            onClickSquare={() => this.movePieceTo(row, column)}
-            isHighlighted={this.state.availableMoves[row][column] !== 0}
-            isWhiteMove={this.props.isWhiteMove}
-          />
-        );
+      this.pushToRowDisplay(false, row, column, rowDisplay);
     } else {
-      column % 2 === 0 ?
-        rowDisplay.push(
-          <Square
-            isWhiteSquare={false}
-            hasWhitePiece={this.state.board[row][column] === 1}
-            hasRedPiece={this.state.board[row][column] === 2}
-            onClickPiece={(event) => this.onClickPiece(row, column, event)}
-            onClickSquare={() => this.movePieceTo(row, column)}
-            isHighlighted={this.state.availableMoves[row][column] !== 0}
-            isWhiteMove={this.props.isWhiteMove}
-          />
-        ) : rowDisplay.push(
-          <Square
-            isWhiteSquare={true}
-            hasWhitePiece={false}
-            hasRedPiece={false}
-          />
-        );
+      this.pushToRowDisplay(true, row, column, rowDisplay);
     }
   }
 
-  // TODO: This is a debugging method. Remove when app is done
-  renderMoves() {
-    const moves = [];
-    for(const row of this.state.availableMoves) {
-      const rowDisplay = [];
-      for(const square of row) {
-        rowDisplay.push(
-          <div className="debug">
-            {square}
-          </div>
-        );
-      }
-      moves.push(
-        <div className="row">
-          {rowDisplay}
-        </div>
+  pushToRowDisplay(isBlackSquareFirstInRow, row, column, rowDisplay) {
+    column % 2 == isBlackSquareFirstInRow ?
+      rowDisplay.push(
+        <Square
+          isWhiteSquare={true}
+          hasWhitePiece={false}
+          hasRedPiece={false}
+        />
+      ) : rowDisplay.push(
+        <Square
+          isWhiteSquare={false}
+          hasWhitePiece={this.state.board[row][column] % 10 === 1}
+          hasRedPiece={this.state.board[row][column] % 10 === 2}
+          hasKingPiece={this.state.board[row][column] > 2}
+          onClickPiece={(event) => this.onClickPiece(row, column, event)}
+          onClickSquare={() => this.movePieceTo(row, column)}
+          isHighlighted={this.state.availableMoves[row][column] !== 0}
+          isWhiteMove={this.props.isWhiteMove}
+        />
       );
-    }
-    return moves;
   }
 
   render() {
     return (
       <div>
         {this.renderBoard()}
-        <br/>
-        {this.renderMoves()}
       </div>
     );
   }
